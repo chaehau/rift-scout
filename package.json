@@ -1,0 +1,64 @@
+{
+  "name": "rift-scout",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "峡谷斥候：LoL 对局侦察助手，自动侦测对局并聚合十名玩家的段位与逐场战绩",
+  "author": "yuzhu",
+  "main": "desktop/main.mjs",
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "dev": "node --watch src/index.ts",
+    "start": "node src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "web": "npm --prefix web run dev",
+    "build:web": "npm --prefix web run build",
+    "build:bridge": "esbuild src/bridge-entry.ts --bundle --platform=node --format=cjs --outfile=dist/bridge.cjs",
+    "build": "npm run build:web && npm run build:bridge",
+    "desktop": "npm run build && electron .",
+    "dist": "npm run build && electron-builder --win portable",
+    "probe": "node scripts/lcu-probe.mjs"
+  },
+  "build": {
+    "appId": "com.riftscout.app",
+    "productName": "峡谷斥候",
+    "electronDist": "node_modules/electron/dist",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "desktop/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/bridge.cjs",
+        "to": "bridge.cjs"
+      },
+      {
+        "from": "web/dist",
+        "to": "web"
+      }
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "portable": {
+      "artifactName": "峡谷斥候.exe",
+      "requestExecutionLevel": "admin"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,24 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+web/dist/
+release/
+release-*/
+
+# electron-builder 缓存与调试用户目录
+.eb-cache/
+.electron-cache/
+.npm-cache/
+.userdata/
+
+# 本地探测输出（可能包含真实 Riot ID / puuid，绝不提交）
+lookup-probe.json
+scripts/lookup-probe.json
+
+# 日志与临时文件
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

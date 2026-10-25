@@ -1,0 +1,999 @@
+:root {
+  --bg: #0b0f14;
+  --panel: #121922;
+  --panel-2: #16202b;
+  --line: #1f2b38;
+  --text: #e6edf3;
+  --muted: #8b98a5;
+  --ally: #4aa3ff;
+  --enemy: #ff5f5f;
+  --win: #2fbf71;
+  --lose: #e04b4b;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+}
+
+#app {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 12px 14px 18px;
+  /* 纵向铺满窗口，个人战绩页才能把战绩区拉到底 */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* —— 个人战绩页：查询结果占满剩余高度 —— */
+/* 该页 #app 锁定视口高度，场次再多也在战绩区内部滚动，不会把整页撑高 */
+#app:has(> .searchbar) {
+  height: 100vh;
+}
+
+#app > .team {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#app > .team > .row {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
+  /* 单行网格撑满，右侧战绩区才有确定高度做内部滚动 */
+  grid-template-rows: minmax(0, 1fr);
+}
+
+#app > .team > .row > .who {
+  align-self: start;
+}
+
+/* 不再是固定 268px 的小滚动窗：吃掉整行剩余高度，场次多时内部滚动 */
+#app > .team > .row > .games.expanded {
+  max-height: none;
+  min-height: 0;
+  align-content: start;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  grid-auto-rows: minmax(56px, auto);
+  overflow-y: auto;
+}
+
+/* —— 顶栏 —— */
+.top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+}
+
+.dot.ingame {
+  background: var(--win);
+  box-shadow: 0 0 8px rgba(47, 191, 113, 0.8);
+}
+
+.dot.champselect {
+  background: #f0b429;
+  box-shadow: 0 0 8px rgba(240, 180, 41, 0.7);
+}
+
+.dot.denied,
+.dot.notrunning,
+.dot.error,
+.dot.offline {
+  background: var(--lose);
+}
+
+.dot.warming {
+  background: #f0b429;
+}
+
+.phase {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.game-id {
+  color: #4b5b6b;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.top-right {
+  color: #4b5b6b;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 手动刷新：不再定时拉战绩，改由用户点这里（R22） */
+.refresh-btn {
+  align-self: center;
+  height: 24px;
+  margin-right: 10px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid #2c4a6b;
+  background: rgba(74, 163, 255, 0.16);
+  color: #cfe4ff;
+  font-family: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: rgba(74, 163, 255, 0.26);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* —— 页面切换：对局侦察 / 个人战绩 —— */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  margin-bottom: -1px;
+  padding: 6px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: #cfe4ff;
+}
+
+.tab.active {
+  color: #e8f2ff;
+  border-bottom-color: #4aa3ff;
+  font-weight: 600;
+}
+
+/* —— 查询栏 —— */
+.searchbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.search-input::placeholder {
+  color: #55636f;
+}
+
+.search-input:focus {
+  border-color: #31567d;
+  background: var(--panel-2);
+}
+
+.search-btn {
+  flex: 0 0 auto;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid #2c4a6b;
+  background: rgba(74, 163, 255, 0.16);
+  color: #cfe4ff;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.search-btn:hover:not(:disabled) {
+  background: rgba(74, 163, 255, 0.26);
+}
+
+.search-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.search-btn.ghost {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--muted);
+}
+
+.team-head .query {
+  color: #6f7f8e;
+  letter-spacing: 0;
+}
+
+.lookup-error {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #e8a3a3;
+  background: rgba(224, 75, 75, 0.1);
+  border: 1px solid rgba(224, 75, 75, 0.25);
+  font-size: 11.5px;
+}
+
+.idle-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 10px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+/* —— 队伍 —— */
+.team + .team {
+  margin-top: 14px;
+}
+
+/* 对局侦察：两队左右并排，横向铺满；避免十人纵向拉成长条 */
+.board-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.board-cols .team + .team {
+  margin-top: 0;
+}
+
+/* 列内玩家行改成上下两段：身份在上，10 场战绩横铺在下 */
+.board-cols .row,
+.board-cols .placeholder-row {
+  grid-template-columns: 1fr;
+  gap: 6px;
+  align-items: stretch;
+}
+
+/* 我方占位行用蓝色左边条，与真实行一致 */
+.board-cols .team:first-child .placeholder-row {
+  border-left-color: rgba(74, 163, 255, 0.25);
+  border-left-style: solid;
+}
+
+@media (max-width: 1000px) {
+  .board-cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+.team-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px 2px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+.team-head::before {
+  content: '';
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--ally);
+}
+
+.team-head.enemy::before {
+  background: var(--enemy);
+}
+
+.locked {
+  color: #5d6b7a;
+  letter-spacing: 0;
+}
+
+/* —— 玩家行 —— */
+.row {
+  display: grid;
+  grid-template-columns: 198px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--panel);
+  border-left: 3px solid transparent;
+}
+
+.row + .row {
+  margin-top: 6px;
+}
+
+.row.ally {
+  border-left-color: rgba(74, 163, 255, 0.55);
+}
+
+.row.enemy {
+  border-left-color: rgba(255, 95, 95, 0.55);
+}
+
+.row.self {
+  background: var(--panel-2);
+  box-shadow: inset 0 0 0 1px rgba(74, 163, 255, 0.35);
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* 点名快捷查询：整块可点 */
+.who.link {
+  cursor: pointer;
+}
+
+.who.link:hover .name {
+  color: #9ccbff;
+  text-decoration: underline;
+}
+
+.who.link:focus-visible {
+  outline: 1px solid rgba(74, 163, 255, 0.6);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.avatar {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #0d141c;
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 本局英雄：在名字前的小图标 */
+.champ {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: cover;
+  background: #0d141c;
+}
+
+.qmark {
+  color: #46525f;
+  font-size: 15px;
+}
+
+.meta {
+  min-width: 0;
+}
+
+.name-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.name {
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag {
+  color: #5d6b7a;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.me {
+  flex: 0 0 auto;
+  font-size: 10px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: rgba(74, 163, 255, 0.18);
+  color: var(--ally);
+}
+
+.rank-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.rank {
+  color: var(--muted);
+}
+
+.tier-bronze {
+  color: #b07b4f;
+}
+.tier-silver {
+  color: #aab6c2;
+}
+.tier-gold {
+  color: #d9b44a;
+}
+.tier-platinum {
+  color: #4fd1c5;
+}
+.tier-emerald {
+  color: #3ecf8e;
+}
+.tier-diamond {
+  color: #5b9dff;
+}
+.tier-master {
+  color: #b36bff;
+}
+.tier-grandmaster {
+  color: #ff6b6b;
+}
+.tier-challenger {
+  color: #ffd166;
+}
+.tier-none {
+  color: #6b7885;
+}
+
+.summary {
+  color: #5d6b7a;
+}
+
+/* —— 近 10 场 —— */
+.games {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 3px;
+  min-width: 0;
+}
+
+/* 查询某人时战绩可能有几十场：换行排列并限高滚动 */
+.games.expanded {
+  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  max-height: 268px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.game {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 1px 2px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.game:hover {
+  filter: brightness(1.35);
+}
+
+.game.win {
+  background: rgba(47, 191, 113, 0.14);
+  border-bottom-color: rgba(47, 191, 113, 0.75);
+}
+
+.game.lose {
+  background: rgba(224, 75, 75, 0.14);
+  border-bottom-color: rgba(224, 75, 75, 0.75);
+}
+
+.gicon {
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  object-fit: cover;
+  display: block;
+  background: #0d141c;
+}
+
+/* 该场对局模式：窄列放不下全名，超长省略，完整名见悬停提示 */
+.mode {
+  max-width: 100%;
+  font-size: 9.5px;
+  line-height: 1.1;
+  color: #7d8b99;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.game.win .mode {
+  color: #7fae93;
+}
+
+.game.lose .mode {
+  color: #b08b8b;
+}
+
+.kda {
+  font-size: 10px;
+  line-height: 1.15;
+  color: #c3ced9;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.game.lose .kda {
+  color: #c9a2a2;
+}
+
+.state {
+  /* 与战绩条同高：某个人「战绩已隐藏/读取失败」时，两侧行高仍然对齐 */
+  display: flex;
+  align-items: center;
+  min-height: 55px;
+  color: #6b7885;
+  font-size: 11.5px;
+  padding-left: 2px;
+}
+
+.state.error {
+  color: var(--lose);
+}
+
+/* —— 占位行（选人阶段敌方） —— */
+.placeholder-row {
+  display: grid;
+  grid-template-columns: 198px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(18, 25, 34, 0.55);
+  border: 1px dashed #223041;
+  border-left: 3px solid rgba(255, 95, 95, 0.25);
+}
+
+.placeholder-row + .placeholder-row {
+  margin-top: 6px;
+}
+
+.ph-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  background: #121a24;
+  border: 1px dashed #3f5876;
+}
+
+.ph-lines {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 占位战绩：与真实行一样 10 块横排，保证骨架高度与实体一致 */
+.ph-games {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.ph-game {
+  display: block;
+  height: 53px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.06);
+}
+
+.ph-lines div {
+  height: 8px;
+  border-radius: 3px;
+  background: #34485f;
+}
+
+.ph-lines div:first-child {
+  width: 42%;
+}
+
+.ph-lines div:last-child {
+  width: 78%;
+  height: 16px;
+  background: #2c3e53;
+}
+
+/* —— 空态 / 引导 —— */
+.center-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: calc(100vh - 96px);
+  text-align: center;
+  padding: 24px;
+}
+
+.center-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.center-sub {
+  color: var(--muted);
+  font-size: 12px;
+  max-width: 460px;
+  line-height: 1.7;
+}
+
+.badge-warn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: #ffb4b4;
+  background: rgba(224, 75, 75, 0.14);
+  border: 1px solid rgba(224, 75, 75, 0.3);
+}
+
+.badge-ok {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: #9fe6bd;
+  background: rgba(47, 191, 113, 0.12);
+  border: 1px solid rgba(47, 191, 113, 0.28);
+}
+
+/* —— 对局详情 —— */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: rgba(4, 8, 12, 0.74);
+}
+
+.detail {
+  width: min(900px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+.detail-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.detail-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+
+.result {
+  font-weight: 600;
+}
+
+.result.win {
+  color: var(--win);
+}
+
+.result.lose {
+  color: var(--lose);
+}
+
+.dim {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.detail-close {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.detail-close:hover {
+  color: var(--text);
+  background: var(--panel-2);
+}
+
+.detail-loading,
+.detail-error {
+  padding: 28px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.detail-error {
+  color: #e8a3a3;
+}
+
+.detail-team {
+  padding: 8px 12px 12px;
+}
+
+.dtable {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.drow {
+  display: grid;
+  /* 末列（装备）留够 6 件装备 + 右侧饰品 */
+  grid-template-columns: 118px minmax(110px, 1fr) 70px 44px 54px 58px 36px 136px;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dhead {
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+
+/* —— 玩家块：一行数据 + 玩家名右侧的海克斯列 —— */
+.dplayer {
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.dplayer.ally {
+  border-left: 3px solid rgba(74, 163, 255, 0.55);
+}
+
+.dplayer.enemy {
+  border-left: 3px solid rgba(255, 95, 95, 0.55);
+}
+
+.dplayer .drow {
+  background: transparent;
+  border-left: 0;
+  border-radius: 0;
+}
+
+.daugments {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 3px;
+  /* 靠玩家列右侧排齐：各行的海克斯图标在同一条竖线上 */
+  margin-left: auto;
+  padding-left: 6px;
+}
+
+.daugment {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #0d141c;
+}
+
+.daugment img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+}
+
+/* 悬停显示海克斯名称 */
+.daugment::after {
+  content: attr(data-name);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #0b1118;
+  color: var(--text);
+  font-size: 10.5px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.08s;
+}
+
+.daugment:hover::after {
+  opacity: 1;
+}
+
+/* 稀有度：白银 / 黄金 / 棱彩 */
+.daugment.r-silver {
+  border-color: rgba(190, 205, 220, 0.5);
+}
+
+.daugment.r-gold {
+  border-color: rgba(240, 190, 80, 0.6);
+}
+
+.daugment.r-prismatic {
+  border-color: rgba(180, 140, 255, 0.7);
+  box-shadow: 0 0 6px rgba(180, 140, 255, 0.25);
+}
+
+.dchamp {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.dchamp > img {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  background: #0d141c;
+}
+
+.dlevel {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.dspells {
+  display: flex;
+  gap: 2px;
+}
+
+.dspells img {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  background: #0d141c;
+}
+
+.dwho {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.davatar {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #0d141c;
+}
+
+.dname {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dkda {
+  color: #c3ced9;
+}
+
+.ditems {
+  display: flex;
+  gap: 2px;
+}
+
+.ditems img {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  background: #0d141c;
+}
+
+/* 饰品永远贴装备列右侧，其余装备靠左 */
+.dtrinket {
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .row,
+  .placeholder-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}

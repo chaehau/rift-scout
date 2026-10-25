@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16202b" />
+      <stop offset="1" stop-color="#070b0f" />
+    </linearGradient>
+    <linearGradient id="ally" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8ecbff" />
+      <stop offset="1" stop-color="#2f7fd6" />
+    </linearGradient>
+    <linearGradient id="enemy" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffa0a0" />
+      <stop offset="1" stop-color="#d63f3f" />
+    </linearGradient>
+    <radialGradient id="iris" cx="0.5" cy="0.42" r="0.62">
+      <stop offset="0" stop-color="#223244" />
+      <stop offset="1" stop-color="#05080c" />
+    </radialGradient>
+    <clipPath id="leftHalf">
+      <rect x="0" y="0" width="128" height="256" />
+    </clipPath>
+    <clipPath id="rightHalf">
+      <rect x="128" y="0" width="128" height="256" />
+    </clipPath>
+  </defs>
+
+  <!-- 圆角底板 -->
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bg)" />
+
+  <!-- 眼形：左蓝（我方）右红（敌方） -->
+  <g>
+    <path d="M24 128 C60 62 196 62 232 128 C196 194 60 194 24 128 Z" fill="url(#ally)" clip-path="url(#leftHalf)" />
+    <path d="M24 128 C60 62 196 62 232 128 C196 194 60 194 24 128 Z" fill="url(#enemy)" clip-path="url(#rightHalf)" />
+    <path d="M24 128 C60 62 196 62 232 128 C196 194 60 194 24 128 Z" fill="none" stroke="#eaf4ff" stroke-opacity="0.38" stroke-width="7" stroke-linejoin="round" />
+  </g>
+
+  <!-- 瞳孔 -->
+  <circle cx="128" cy="128" r="46" fill="url(#iris)" />
+  <circle cx="128" cy="128" r="46" fill="none" stroke="#eaf4ff" stroke-opacity="0.5" stroke-width="7" />
+  <circle cx="128" cy="128" r="17" fill="#eaf4ff" />
+  <circle cx="117" cy="115" r="6" fill="#ffffff" />
+
+  <!-- 中缝：明确左右分界 -->
+  <rect x="126" y="66" width="4" height="124" rx="2" fill="#05080c" fill-opacity="0.55" />
+</svg>
