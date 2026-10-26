@@ -1,7 +1,7 @@
 {
   "name": "rift-scout",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "峡谷斥候：LoL 对局侦察助手，自动侦测对局并聚合十名玩家的段位与逐场战绩",
   "author": "yuzhu",
