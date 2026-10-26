@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
   augmentIconUrl,
   fetchMatchDetail,
@@ -10,7 +10,9 @@ import {
 } from '../api'
 import type { MatchDetailResponse } from '../types'
 
-const props = defineProps<{ gameId: number; puuid: string }>()
+const props = withDefaults(defineProps<{ gameId: number; puuid: string; highlight?: string }>(), {
+  highlight: '',
+})
 const emit = defineEmits<{ close: [] }>()
 
 const data = ref<MatchDetailResponse | null>(null)
@@ -36,12 +38,8 @@ function num(n: number): string {
   return n >= 10000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 }
 
-function onKey(e: KeyboardEvent): void {
-  if (e.key === 'Escape') emit('close')
-}
-
+// Esc 关闭由 App 统一处理（叠了相遇清单时先关详情）
 onMounted(async () => {
-  window.addEventListener('keydown', onKey)
   try {
     const res = await fetchMatchDetail(props.gameId, props.puuid)
     if (!res.ok) {
@@ -53,8 +51,6 @@ onMounted(async () => {
     error.value = (e as Error).message
   }
 })
-
-onUnmounted(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>
@@ -99,7 +95,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
               v-for="p in team.players"
               :key="p.puuid + p.championId"
               class="dplayer"
-              :class="team.side"
+              :class="[team.side, { hit: highlight && p.puuid === highlight }]"
             >
               <div class="drow">
                 <span class="dchamp">
@@ -117,7 +113,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
                     alt=""
                     loading="lazy"
                   />
-                  <span class="dname" :title="`${p.gameName}#${p.tagLine}`">{{ p.gameName }}</span>
+                  <span class="dname" :title="`${p.gameName}#${p.tagLine}`"
+                    >{{ p.gameName }}<span class="dtag">#{{ p.tagLine }}</span></span
+                  >
                   <!-- 海克斯类模式专属：填在玩家名右侧的空位，悬停显示名称 -->
                   <span v-if="p.augments.length" class="daugments">
                     <span

@@ -160,6 +160,18 @@ body {
   cursor: default;
 }
 
+.refresh-btn.ghost {
+  margin-right: 0;
+  margin-left: 8px;
+  border-color: var(--line);
+  background: transparent;
+  color: var(--muted);
+}
+
+.refresh-btn.ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 /* —— 页面切换：对局侦察 / 个人战绩 —— */
 .tabs {
   display: flex;
@@ -456,6 +468,36 @@ body {
   border-radius: 3px;
   background: rgba(74, 163, 255, 0.18);
   color: var(--ally);
+}
+
+/* 与我方某人同队开黑：人数含本人，仅我方可见 */
+.party {
+  flex: 0 0 auto;
+  font-size: 10px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: rgba(240, 190, 80, 0.16);
+  color: #e8bf63;
+  white-space: nowrap;
+}
+
+/* 本地对战记录：之前遇到过的人，点击看那几局 */
+.met {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border: 1px solid rgba(160, 130, 255, 0.32);
+  border-radius: 3px;
+  background: rgba(160, 130, 255, 0.16);
+  color: #c9b6ff;
+  font-family: inherit;
+  font-size: 10px;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.met:hover {
+  background: rgba(160, 130, 255, 0.28);
 }
 
 .rank-line {
@@ -830,6 +872,174 @@ body {
   letter-spacing: 0.5px;
 }
 
+/* —— 设置页：本地记录保存位置 —— */
+.settings-panel {
+  width: min(560px, 100%);
+}
+
+.set-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px 14px;
+}
+
+.set-label {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.set-row {
+  display: flex;
+  gap: 6px;
+}
+
+.set-hint {
+  color: #5d6b7a;
+  font-size: 10.5px;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.set-hint code,
+.set-note code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #8fa6bb;
+  font-family: Consolas, 'Courier New', monospace;
+}
+
+.set-note {
+  color: #55636f;
+  font-size: 10.5px;
+  line-height: 1.7;
+}
+
+.set-warn {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(240, 190, 80, 0.12);
+  color: #e8bf63;
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+
+.set-notice {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(74, 163, 255, 0.12);
+  color: #9ccbff;
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+
+.set-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+/* —— 相遇清单（本地对战记录） —— */
+.met-panel {
+  width: min(580px, 100%);
+}
+
+.met-name {
+  font-weight: 600;
+}
+
+.met-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 10px 12px;
+  list-style: none;
+}
+
+.met-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto auto;
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.met-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.met-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.met-mode {
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.met-champ {
+  margin-left: 6px;
+  color: #6f7f8e;
+  font-size: 10.5px;
+}
+
+.met-time {
+  color: #5d6b7a;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.met-side {
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.met-side.ally {
+  background: rgba(74, 163, 255, 0.16);
+  color: #9ccbff;
+}
+
+.met-side.enemy {
+  background: rgba(255, 95, 95, 0.16);
+  color: #ffa8a8;
+}
+
+.met-id {
+  color: #4b5b6b;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.met-tip {
+  padding: 0 12px 12px;
+  color: #55636f;
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+
+/* 详情页里把「老熟人」标出来 */
+.dplayer.hit {
+  background: rgba(160, 130, 255, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(160, 130, 255, 0.45);
+}
+
 /* —— 玩家块：一行数据 + 玩家名右侧的海克斯列 —— */
 .dplayer {
   border-radius: 6px;
@@ -967,6 +1177,11 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 详情页玩家名后的 TAG，弱化处理 */
+.dtag {
+  color: #5d6b7a;
 }
 
 .dkda {

@@ -1,5 +1,18 @@
-import type { BoardResponse, LookupResponse, MatchDetailResponse, StatusResponse } from './types'
-import { mockBoard, mockLookup, mockMatchDetail, mockStatus } from './mock'
+import type {
+  BoardResponse,
+  LookupResponse,
+  MatchDetailResponse,
+  SettingsResponse,
+  StatusResponse,
+} from './types'
+import {
+  mockBoard,
+  mockLookup,
+  mockMatchDetail,
+  mockSaveSettings,
+  mockSettings,
+  mockStatus,
+} from './mock'
 
 const params = new URLSearchParams(location.search)
 const mockKind = import.meta.env.DEV ? params.get('mock') : null
@@ -89,4 +102,34 @@ export async function fetchMatchDetail(gameId: number, puuid: string): Promise<M
   })
   if (!res.ok) throw new Error(`桥接服务返回 ${res.status}`)
   return (await res.json()) as MatchDetailResponse
+}
+
+/** 读取本地记录的保存位置与已记录局数 */
+export async function fetchSettings(): Promise<SettingsResponse> {
+  if (mockKind) {
+    await new Promise((r) => setTimeout(r, 80))
+    if (mockKind === 'offline') throw new Error('无法连接 http://127.0.0.1:8737')
+    return mockSettings()
+  }
+  const res = await fetch('/api/settings', { cache: 'no-store', signal: AbortSignal.timeout(8_000) })
+  if (!res.ok) throw new Error(`桥接服务返回 ${res.status}`)
+  return (await res.json()) as SettingsResponse
+}
+
+/** 保存新的保存位置；dataDir 为空表示恢复默认 */
+export async function saveSettings(dataDir: string): Promise<SettingsResponse> {
+  if (mockKind) {
+    await new Promise((r) => setTimeout(r, 120))
+    if (mockKind === 'offline') throw new Error('无法连接 http://127.0.0.1:8737')
+    return mockSaveSettings(dataDir)
+  }
+  const res = await fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataDir }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (!res.ok) throw new Error(`桥接服务返回 ${res.status}`)
+  return (await res.json()) as SettingsResponse
 }

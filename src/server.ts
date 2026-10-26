@@ -28,6 +28,20 @@ function sendJson(res: http.ServerResponse, code: number, body: unknown): void {
   res.end(text)
 }
 
+/** 读取 JSON 请求体（只给设置接口用，限制大小） */
+async function readJson(req: http.IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = []
+  let size = 0
+  for await (const chunk of req) {
+    const buf = chunk as Buffer
+    size += buf.length
+    if (size > 8192) throw new Error('请求体过大')
+    chunks.push(buf)
+  }
+  const text = Buffer.concat(chunks).toString('utf8').trim()
+  return text ? JSON.parse(text) : {}
+}
+
 /** 打包后的前端静态资源；同时服务 Web 形态与 Electron 窗口（DEC-011） */
 async function serveStatic(root: string, pathname: string, res: http.ServerResponse): Promise<void> {
   const rel = decodeURIComponent(pathname)
@@ -72,9 +86,25 @@ export function startServer(
       res.writeHead(204, {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': '*',
-        'Access-Control-Allow-Methods': 'GET,OPTIONS',
+        'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
       })
       res.end()
+      return
+    }
+
+    // 设置接口需要写：目前只开放 POST /api/settings，其余一律只读
+    if (req.method === 'POST') {
+      try {
+        if (url.pathname !== '/api/settings') {
+          sendJson(res, 405, { ok: false, error: `仅 /api/settings 支持 POST，收到 ${url.pathname}` })
+          return
+        }
+        const body = (await readJson(req)) as { dataDir?: unknown }
+        const dataDir = typeof body?.dataDir === 'string' ? body.dataDir : ''
+        sendJson(res, 200, await service.setDataDir(dataDir))
+      } catch (err) {
+        sendJson(res, 400, { ok: false, error: (err as Error).message })
+      }
       return
     }
 
@@ -86,6 +116,10 @@ export function startServer(
     try {
       if (url.pathname === '/api/status') {
         sendJson(res, 200, await service.status())
+        return
+      }
+      if (url.pathname === '/api/settings') {
+        sendJson(res, 200, service.settings())
         return
       }
       if (url.pathname === '/api/board') {

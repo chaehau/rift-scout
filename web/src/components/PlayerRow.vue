@@ -4,7 +4,7 @@ import { iconUrl, profileIconUrl } from '../api'
 import type { PlayerCard } from '../types'
 
 const props = defineProps<{ player: PlayerCard; self: boolean; expanded?: boolean }>()
-const emit = defineEmits<{ open: [gameId: number]; lookup: [] }>()
+const emit = defineEmits<{ open: [gameId: number]; lookup: []; encounters: [] }>()
 
 const tierClass = computed(() => {
   const tier = props.player.rank?.tier
@@ -73,6 +73,20 @@ function kda(g: { kills: number; deaths: number; assists: number }): string {
           </span>
           <span class="tag">#{{ player.tagLine }}</span>
           <span v-if="self" class="me">我</span>
+          <button
+            v-if="player.met > 0"
+            class="met"
+            type="button"
+            :title="`本地记录：之前遇到过 ${player.met} 次，点击查看那几局`"
+            @click.stop="emit('encounters')"
+          >
+            遇过{{ player.met }}
+          </button>
+          <span
+            v-if="player.partySize >= 2"
+            class="party"
+            :title="`与另外 ${player.partySize - 1} 人组队（仅我方可见）`"
+          >组队{{ player.partySize }}</span>
         </div>
         <div class="rank-line">
           <span class="rank" :class="tierClass">{{ rankText }}</span>

@@ -18,6 +18,7 @@ import {
   type LcuEntitlements,
   type LcuGameflowSession,
   type LcuIconAsset,
+  type LcuLobbyMember,
   type LcuMatchGame,
   type LcuMatchIdentity,
   type LcuMatchList,
@@ -28,9 +29,12 @@ import {
   type LcuTeamPlayer,
   type SgpMatchGame,
 } from './lcu.ts'
+import { EncounterStore, ENCOUNTER_FILE, type EncounterGame, type EncounterHit } from './encounters.ts'
+import { defaultDataDir, loadSettings, saveSettings } from './settings.ts'
 import type {
   BoardResponse,
   ClientState,
+  EncounterRef,
   GameRecord,
   LookupResponse,
   MatchAugment,
@@ -40,6 +44,7 @@ import type {
   PlayerState,
   RankInfo,
   RankState,
+  SettingsResponse,
   StatusResponse,
 } from './types.ts'
 
@@ -91,6 +96,8 @@ interface RosterEntry {
   tagLine: string
   championId: number | null
   side: 'ally' | 'enemy'
+  /** 与本人同队开黑的人数；0 = 单人/未知 */
+  partySize?: number
 }
 
 interface PlayerSnapshot {
@@ -203,6 +210,13 @@ export class BoardService {
   private lookupCache = new Map<string, { at: number; value: PlayerSnapshot }>()
   private inflight = new Map<string, Promise<PlayerSnapshot>>()
   private lastGameId: number | null = null
+  /**
+   * 本局的预组队成员：只在选人阶段能读到（对局开始后大厅就没了），
+   * 用 gameId 记下来给对局中使用（DEC-021）。
+   */
+  private party: { gameId: number | null; puuids: string[]; size: number } | null = null
+  /** 本地对战记录：把每局十人落盘，下次排到时标出「遇过几次」 */
+  private encounters = new EncounterStore()
   /** 大区（如 HN1）：LCU 任意一次战绩返回里都带，留着给 SGP 兜底用（跨启动记忆） */
   private platformId: string | null = readRegionCache()
 
@@ -245,6 +259,59 @@ export class BoardService {
       },
       authVia: client.via,
       updatedAt,
+    }
+  }
+
+  /** 本地记录的保存位置：当前目录、默认目录、已记录局数 */
+  settings(): SettingsResponse {
+    return this.settingsInfo()
+  }
+
+  /**
+   * 改保存位置。dataDir 为空表示恢复默认。
+   * 先验证可写，再落设置，最后让 store 切目录（目标已有记录就改读那份）。
+   */
+  async setDataDir(input: string): Promise<SettingsResponse> {
+    const raw = input.trim()
+    const custom = raw.length > 0
+    if (custom && !path.isAbsolute(raw)) {
+      return { ...this.settingsInfo(), ok: false, error: '请填写绝对路径，例如 D:\\峡谷斥候记录' }
+    }
+    const target = custom ? path.resolve(raw) : defaultDataDir()
+
+    try {
+      await fs.promises.mkdir(target, { recursive: true })
+      const probe = path.join(target, '.rift-scout-write-test')
+      await fs.promises.writeFile(probe, 'ok', 'utf8')
+      await fs.promises.unlink(probe)
+    } catch (err) {
+      return {
+        ...this.settingsInfo(),
+        ok: false,
+        error: `这个目录不可写：${(err as Error).message}`,
+      }
+    }
+
+    try {
+      saveSettings({ dataDir: custom ? target : null })
+    } catch (err) {
+      return { ...this.settingsInfo(), ok: false, error: `保存设置失败：${(err as Error).message}` }
+    }
+
+    const mode = this.encounters.setDir(target)
+    return { ...this.settingsInfo(), mode }
+  }
+
+  private settingsInfo(mode?: SettingsResponse['mode']): SettingsResponse {
+    return {
+      ok: true,
+      dataDir: this.encounters.dir,
+      defaultDir: defaultDataDir(),
+      custom: loadSettings().dataDir !== null,
+      envOverride: Boolean(process.env.RIFT_SCOUT_DATA),
+      count: this.encounters.size,
+      file: path.join(this.encounters.dir, ENCOUNTER_FILE),
+      ...(mode ? { mode } : {}),
     }
   }
 
@@ -302,14 +369,21 @@ export class BoardService {
         return fail(`选人会话读取失败（HTTP ${cs.status}）`, phase)
       }
       this.noteGame(cs.data.gameId ?? null)
+      const party = await this.readParty(client)
+      this.party =
+        party && party.puuids.length >= 2
+          ? { gameId: cs.data.gameId ?? null, puuids: party.puuids, size: party.puuids.length }
+          : null
+      const partySet = new Set(this.party?.puuids ?? [])
       const entries: RosterEntry[] = (cs.data.myTeam ?? []).map((p) => ({
         puuid: p.puuid,
         gameName: p.gameName ?? '',
         tagLine: p.tagLine ?? '',
         championId: p.championId || p.championPickIntent || null,
         side: 'ally',
+        partySize: partySet.has(p.puuid) ? (this.party?.size ?? 0) : 0,
       }))
-      const players = await this.aggregate(client, entries)
+      const players = await this.aggregate(client, entries, cs.data.gameId ?? null)
       return {
         ok: true,
         phase,
@@ -347,6 +421,15 @@ export class BoardService {
 
       const allyRaw = mineIsOne ? one : two
       const enemyRaw = mineIsOne ? two : one
+      // 组队名单只在选人阶段读得到，这里按 gameId（或成员全部落在我方）沿用
+      const remembered = this.party
+      const partySet = new Set(
+        remembered &&
+          (remembered.gameId === gameId ||
+            remembered.puuids.every((id) => allyRaw.some((p) => p.puuid === id)))
+          ? remembered.puuids
+          : []
+      )
       const entries: RosterEntry[] = [
         ...allyRaw.map((p) => ({
           puuid: p.puuid,
@@ -354,6 +437,7 @@ export class BoardService {
           tagLine: '',
           championId: p.championId ?? null,
           side: 'ally' as const,
+          partySize: partySet.has(p.puuid) ? partySet.size : 0,
         })),
         ...enemyRaw.map((p) => ({
           puuid: p.puuid,
@@ -363,12 +447,15 @@ export class BoardService {
           side: 'enemy' as const,
         })),
       ]
-      const players = await this.aggregate(client, entries)
+      const queueId = typeof gd.queue === 'object' && gd.queue ? (gd.queue.id ?? null) : null
+      const players = await this.aggregate(client, entries, gameId)
+      // 十人名单齐了才值得落盘，记录后本局在下轮会出现在别人的「遇过」里
+      this.recordEncounter(gameId, queueId, myPuuid, players)
       return {
         ok: true,
         phase,
         gameId,
-        queueId: typeof gd.queue === 'object' && gd.queue ? (gd.queue.id ?? null) : null,
+        queueId,
         selfPuuid: myPuuid,
         teams: [
           { side: 'ally', players: players.filter((p) => p.side === 'ally') },
@@ -441,6 +528,9 @@ export class BoardService {
         rank: snapshot.rank,
         rankState: snapshot.rankState,
         recent: snapshot.recent,
+        partySize: 0,
+        met: 0,
+        metGames: [],
         state: snapshot.state,
         ...(snapshot.error ? { error: snapshot.error } : {}),
       },
@@ -776,8 +866,23 @@ export class BoardService {
     }
   }
 
-  private async aggregate(client: LcuClient, entries: RosterEntry[]): Promise<PlayerCard[]> {
-    return Promise.all(
+  /**
+   * 大厅成员 = 本人这支预组队。LCU 没有「敌方队伍怎么分组」的数据，
+   * 所以组队标记只能给我方，且只在选人阶段读得到（DEC-021）。
+   */
+  private async readParty(client: LcuClient): Promise<{ puuids: string[] } | null> {
+    const res = await client.get<LcuLobbyMember[]>(endpoints.lobbyMembers)
+    if (res.status !== 200 || !Array.isArray(res.data)) return null
+    const puuids = res.data.map((m) => m?.puuid).filter((v): v is string => Boolean(v))
+    return puuids.length ? { puuids } : null
+  }
+
+  private async aggregate(
+    client: LcuClient,
+    entries: RosterEntry[],
+    excludeGameId: number | null = null
+  ): Promise<PlayerCard[]> {
+    const cards = await Promise.all(
       entries.map(async (entry) => {
         const [snapshot, resolved] = await Promise.all([
           this.waitLimited(this.snapshot(client, entry.puuid)),
@@ -794,11 +899,72 @@ export class BoardService {
           rank: snapshot.rank,
           rankState: snapshot.rankState,
           recent: snapshot.recent,
+          partySize: entry.partySize ?? 0,
+          met: 0,
+          metGames: [] as EncounterRef[],
           state: snapshot.state,
           ...(snapshot.error ? { error: snapshot.error } : {}),
         }
       })
     )
+    this.attachEncounters(cards, excludeGameId)
+    return cards
+  }
+
+  /**
+   * 给本局每个人都标上「本地记录里遇过几次」。
+   * 数据只来自本机看到过的对局，与客户端是否下发敌方信息无关（DEC-022）。
+   */
+  private attachEncounters(players: PlayerCard[], excludeGameId: number | null): void {
+    const hits = this.encounters.against(
+      players.map((p) => p.puuid),
+      excludeGameId
+    )
+    for (const player of players) {
+      const summary = hits.get(player.puuid)
+      player.met = summary?.total ?? 0
+      player.metGames = (summary?.recent ?? []).map((hit) => this.toEncounterRef(hit))
+    }
+  }
+
+  private toEncounterRef(hit: EncounterHit): EncounterRef {
+    return {
+      gameId: hit.gameId,
+      recordedAt: hit.recordedAt,
+      queueId: hit.queueId,
+      queueName: this.queueName(hit.queueId),
+      championId: hit.championId,
+      championName: this.championName(hit.championId),
+      ally: hit.ally,
+    }
+  }
+
+  /**
+   * 记录本局十人名单。同一局重复上报由 store 去重，
+   * 名单比上次更全时会覆盖（开局初期可能不满十人）。
+   */
+  private recordEncounter(
+    gameId: number,
+    queueId: number | null,
+    selfPuuid: string,
+    players: PlayerCard[]
+  ): void {
+    const game: EncounterGame = {
+      gameId,
+      recordedAt: new Date().toISOString(),
+      queueId,
+      selfPuuid,
+      players: players
+        .filter((p) => p.puuid)
+        .map((p) => ({
+          puuid: p.puuid,
+          gameName: p.gameName,
+          tagLine: p.tagLine,
+          championId: p.championId,
+          ally: p.side === 'ally',
+        })),
+    }
+    this.encounters.record(game)
   }
 
   /** 名字 → puuid：先是 Riot ID（名字+TAG），再退化到只按名字 */

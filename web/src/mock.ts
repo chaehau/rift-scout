@@ -2,6 +2,7 @@
 
 import type {
   BoardResponse,
+  EncounterRef,
   GameRecord,
   LookupResponse,
   MatchAugment,
@@ -9,6 +10,7 @@ import type {
   MatchPlayerDetail,
   PlayerCard,
   RankInfo,
+  SettingsResponse,
   StatusResponse,
 } from './types'
 
@@ -84,27 +86,49 @@ interface Seed {
   icon: number
   rank: RankInfo | null
   state?: 'ok' | 'hidden' | 'error'
+  /** 与「我」同队开黑的人数（仅我方，用于预览组队标记） */
+  party?: number
+  /** 本地记录里遇到过的次数（用于预览「遇过N」标记） */
+  met?: number
+}
+
+/** 本地相遇记录（仅开发期预览）：时间、模式、当时用的英雄 */
+function encounterRefs(seed: number, count: number): EncounterRef[] {
+  const r = rand(seed + 771)
+  return Array.from({ length: count }, (_, i) => {
+    const [queueId, queueName] = QUEUES[Math.floor(r() * QUEUES.length)]
+    return {
+      gameId: 401157000000 + seed * 100 + i,
+      recordedAt: new Date(Date.now() - (i + 1) * 86400000 * 3).toISOString(),
+      queueId,
+      queueName,
+      championId: CHAMPS[Math.floor(r() * CHAMPS.length)],
+      championName: null,
+      ally: r() > 0.5,
+    }
+  })
 }
 
 // 全部为虚构玩家名，避免把真实对局里的召唤师名带进仓库
 const ALLY: Seed[] = [
-  { name: '示例玩家01', tag: '10001', champion: 222, icon: 29, rank: rank('EMERALD', 'III', 27) },
-  { name: '示例玩家02', tag: '10002', champion: 76, icon: 4568, rank: rank('GOLD', 'I', 47) },
-  { name: '示例玩家03', tag: '10003', champion: 24, icon: 5212, rank: rank('PLATINUM', 'IV', 17) },
+  { name: '示例玩家01', tag: '10001', champion: 222, icon: 29, rank: rank('EMERALD', 'III', 27), party: 3 },
+  { name: '示例玩家02', tag: '10002', champion: 76, icon: 4568, rank: rank('GOLD', 'I', 47), party: 3, met: 3 },
+  { name: '示例玩家03', tag: '10003', champion: 24, icon: 5212, rank: rank('PLATINUM', 'IV', 17), party: 3 },
   { name: '示例玩家04', tag: '10004', champion: 51, icon: 907, rank: unranked(), state: 'hidden' },
   { name: '示例玩家05', tag: '10005', champion: 59, icon: 1387, rank: rank('EMERALD', 'IV', 7) },
 ]
 
 const ENEMY: Seed[] = [
   { name: '示例玩家06', tag: '20001', champion: 29, icon: 3554, rank: rank('BRONZE', 'III', 87) },
-  { name: '示例玩家07', tag: '20002', champion: 412, icon: 3789, rank: unranked() },
+  { name: '示例玩家07', tag: '20002', champion: 412, icon: 3789, rank: unranked(), met: 2 },
   { name: '示例玩家08', tag: '20003', champion: 161, icon: 502, rank: unranked() },
-  { name: '示例玩家09', tag: '20004', champion: 36, icon: 616, rank: rank('GOLD', 'III', 23) },
+  { name: '示例玩家09', tag: '20004', champion: 36, icon: 616, rank: rank('GOLD', 'III', 23), met: 1 },
   { name: '示例玩家10', tag: '20005', champion: 30, icon: 4218, rank: null },
 ]
 
 function toCard(seed: Seed, index: number, side: 'ally' | 'enemy', gameCount = 10): PlayerCard {
   const state = seed.state ?? 'ok'
+  const met = seed.met ?? 0
   return {
     puuid: `${side}-${index}`,
     gameName: seed.name,
@@ -116,6 +140,9 @@ function toCard(seed: Seed, index: number, side: 'ally' | 'enemy', gameCount = 1
     rank: seed.rank,
     rankState: seed.rank ? 'ok' : 'unranked',
     recent: state === 'ok' ? gamesFor(index + (side === 'ally' ? 3 : 11), seed.champion, gameCount) : [],
+    partySize: seed.party ?? 0,
+    met,
+    metGames: met ? encounterRefs(index + (side === 'ally' ? 1 : 9), met) : [],
     state,
   }
 }
@@ -141,8 +168,9 @@ export function mockLookup(name: string): LookupResponse {
   return {
     ok: true,
     query: `${hit.name}#${hit.tag}`,
-    // 查询他人时展示尽量多的历史（真实后端也是分页拉到底）
-    player: toCard(hit, 0, 'ally', 40),
+    // 查询他人时展示尽量多的历史（真实后端也是分页拉到底）；
+    // 相遇标记只在面板里给，个人战绩页不带（与后端一致）
+    player: { ...toCard(hit, 0, 'ally', 40), met: 0, metGames: [] },
     updatedAt,
     tookMs: 142,
   }
@@ -299,4 +327,34 @@ export function mockStatus(kind: string): StatusResponse {
     return { ...base, client: 'not_running', phase: null, gameId: null, me: null }
   }
   return base
+}
+
+// —— 设置页（mock 版） ——
+const DEFAULT_MOCK_DIR = 'C:\\Users\\示例\\AppData\\Roaming\\RiftScout'
+let mockDataDir = DEFAULT_MOCK_DIR
+
+function mockSettingsBase(): SettingsResponse {
+  return {
+    ok: true,
+    dataDir: mockDataDir,
+    defaultDir: DEFAULT_MOCK_DIR,
+    custom: mockDataDir !== DEFAULT_MOCK_DIR,
+    envOverride: false,
+    count: 12,
+    file: `${mockDataDir}\\encounters.json`,
+  }
+}
+
+export function mockSettings(): SettingsResponse {
+  return mockSettingsBase()
+}
+
+export function mockSaveSettings(dataDir: string): SettingsResponse {
+  const trimmed = dataDir.trim()
+  const changed = trimmed !== mockDataDir
+  mockDataDir = trimmed || DEFAULT_MOCK_DIR
+  return {
+    ...mockSettingsBase(),
+    mode: !changed ? 'unchanged' : trimmed ? 'copied' : 'empty',
+  }
 }

@@ -2,6 +2,8 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import PlayerRow from './components/PlayerRow.vue'
 import MatchDetail from './components/MatchDetail.vue'
+import EncounterList from './components/EncounterList.vue'
+import SettingsPanel from './components/SettingsPanel.vue'
 import { fetchBoard, fetchLookup, fetchStatus } from './api'
 import type { BoardResponse, PlayerCard, StatusResponse } from './types'
 
@@ -38,11 +40,27 @@ const lookupTookMs = ref(0)
 const lookupClock = ref('')
 
 // —— 对局详情 ——
-const detailGame = ref<{ gameId: number; puuid: string } | null>(null)
+const detailGame = ref<{ gameId: number; puuid: string; highlight: string } | null>(null)
 
 function openDetail(player: PlayerCard | null, gameId: number): void {
   if (!player) return
-  detailGame.value = { gameId, puuid: player.puuid }
+  detailGame.value = { gameId, puuid: player.puuid, highlight: '' }
+}
+
+// —— 相遇清单（本地对战记录） ——
+const encounterFor = ref<PlayerCard | null>(null)
+/** 设置弹层（记录保存位置） */
+const settingsOpen = ref(false)
+
+/** 从相遇清单点开某一局：以我方视角看，并把这位老熟人高亮出来 */
+function openEncounterGame(gameId: number): void {
+  const player = encounterFor.value
+  if (!player) return
+  detailGame.value = {
+    gameId,
+    puuid: board.value?.selfPuuid || player.puuid,
+    highlight: player.puuid,
+  }
 }
 
 async function runLookup(text: string, puuid = '', attempt = 0): Promise<void> {
@@ -197,15 +215,31 @@ function wake(): void {
   if (document.visibilityState === 'visible') schedule(0)
 }
 
+/** Esc 只关最上面一层：设置 → 对局详情 → 相遇清单 */
+function onEsc(e: KeyboardEvent): void {
+  if (e.key !== 'Escape') return
+  if (settingsOpen.value) {
+    settingsOpen.value = false
+    return
+  }
+  if (detailGame.value) {
+    detailGame.value = null
+    return
+  }
+  if (encounterFor.value) encounterFor.value = null
+}
+
 onMounted(() => {
   document.addEventListener('visibilitychange', wake)
   window.addEventListener('focus', wake)
+  window.addEventListener('keydown', onEsc)
   void tick()
 })
 onUnmounted(() => {
   alive = false
   document.removeEventListener('visibilitychange', wake)
   window.removeEventListener('focus', wake)
+  window.removeEventListener('keydown', onEsc)
   if (timer) window.clearTimeout(timer)
 })
 
@@ -281,6 +315,9 @@ const topStats = computed(() => {
         {{ refreshBusy ? '刷新中…' : '刷新' }}
       </button>
       <span v-if="topStats">{{ topStats }}</span>
+      <button class="refresh-btn ghost" type="button" title="设置：本地记录保存位置" @click="settingsOpen = true">
+        设置
+      </button>
     </div>
   </div>
 
@@ -432,6 +469,7 @@ const topStats = computed(() => {
             :self="p.puuid === board?.selfPuuid"
             @open="(id) => openDetail(p, id)"
             @lookup="quickLookup(p)"
+            @encounters="encounterFor = p"
           />
         </section>
 
@@ -459,6 +497,7 @@ const topStats = computed(() => {
               :self="p.puuid === board?.selfPuuid"
               @open="(id) => openDetail(p, id)"
               @lookup="quickLookup(p)"
+              @encounters="encounterFor = p"
             />
           </template>
         </section>
@@ -466,10 +505,20 @@ const topStats = computed(() => {
     </template>
   </template>
 
+  <EncounterList
+    v-if="encounterFor"
+    :player="encounterFor"
+    @open="openEncounterGame"
+    @close="encounterFor = null"
+  />
+
   <MatchDetail
     v-if="detailGame"
     :game-id="detailGame.gameId"
     :puuid="detailGame.puuid"
+    :highlight="detailGame.highlight"
     @close="detailGame = null"
   />
+
+  <SettingsPanel v-if="settingsOpen" @close="settingsOpen = false" />
 </template>

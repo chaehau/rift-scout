@@ -33,6 +33,40 @@ export interface RankInfo {
   label: string
 }
 
+/** 本地对战记录里的一次「相遇」：某一局见过这名玩家 */
+export interface EncounterRef {
+  gameId: number
+  /** 记录到这局的时间（ISO） */
+  recordedAt: string
+  queueId: number | null
+  queueName: string | null
+  /** 那局此人用的英雄 */
+  championId: number | null
+  championName: string | null
+  /** 那局此人是否与本人同队 */
+  ally: boolean
+}
+
+/** 本地记录保存位置（设置页） */
+export interface SettingsResponse {
+  ok: boolean
+  /** 当前生效的目录 */
+  dataDir: string
+  /** 未自定义时的默认目录 */
+  defaultDir: string
+  /** 是否为用户自定义目录 */
+  custom: boolean
+  /** 被 RIFT_SCOUT_DATA 环境变量强制指定（此时界面修改不生效） */
+  envOverride: boolean
+  /** 该目录里已记录的局数 */
+  count: number
+  /** 记录文件的完整路径 */
+  file: string
+  /** 刚切换目录时的处理方式：unchanged = 目录没变，existing = 读目标已有记录，copied = 把当前记录复制过去 */
+  mode?: 'unchanged' | 'existing' | 'copied' | 'empty'
+  error?: string
+}
+
 export type PlayerState = 'ok' | 'hidden' | 'error' | 'loading'
 /** 段位状态：查到了 / 确实没打过排位 / 查询失败 / 还在读，四者不能混为一谈 */
 export type RankState = 'ok' | 'unranked' | 'error' | 'loading'
@@ -51,6 +85,18 @@ export interface PlayerCard {
   rankState: RankState
   /** 近 10 场，最新在前 */
   recent: GameRecord[]
+  /**
+   * 与本人同处一个预组队的人数（含本人）。
+   * 0 = 单人开或未知；敌方队伍客户端不下发，一律 0。
+   */
+  partySize: number
+  /**
+   * 本地对战记录里之前遇到过这个人几次；0 = 没记录到过。
+   * 记录只来自本机开着的对局（DEC-022）。
+   */
+  met: number
+  /** 最近几次相遇（最多 8 条，最新在前），供面板展开查看 */
+  metGames: EncounterRef[]
   state: PlayerState
   error?: string
 }

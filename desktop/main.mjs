@@ -1,7 +1,7 @@
 // Electron 外壳：内嵌桥接服务 + 常驻置顶小窗（DEC-011）
 // 开发：npx electron .    打包：npm run dist
 
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -62,7 +62,11 @@ function createWindow() {
     title: '峡谷斥候',
     backgroundColor: '#0f1620',
     autoHideMenuBar: true,
-    webPreferences: { contextIsolation: true, nodeIntegration: false },
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(here, 'preload.cjs'),
+    },
   })
   win.loadURL(ORIGIN)
   // 页面里的外链一律交给系统浏览器
@@ -83,6 +87,15 @@ if (!app.requestSingleInstanceLock()) {
     }
   })
   app.whenReady().then(async () => {
+    // 设置页的「选择文件夹」：只让用户在系统对话框里挑，页面拿不到任意路径能力
+    ipcMain.handle('rift:pick-folder', async () => {
+      const result = await dialog.showOpenDialog({
+        title: '选择战绩记录保存位置',
+        buttonLabel: '用这个文件夹',
+        properties: ['openDirectory', 'createDirectory'],
+      })
+      return result.canceled ? null : (result.filePaths[0] ?? null)
+    })
     await ensureBridge()
     createWindow()
     app.on('activate', () => {

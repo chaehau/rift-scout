@@ -284,6 +284,11 @@ export const endpoints = {
   gameflowPhase: '/lol-gameflow/v1/gameflow-phase',
   gameflowSession: '/lol-gameflow/v1/session',
   champSelectSession: '/lol-champ-select/v1/session',
+  /**
+   * 本人所在预组队的成员。LCU 只下发自己这支队伍，
+   * 敌方是否开黑没有对应字段（DEC-021）。
+   */
+  lobbyMembers: '/lol-lobby/v2/lobby/members',
   matches: (puuid: string, count: number) =>
     `/lol-match-history/v1/products/lol/${puuid}/matches?begIndex=0&endIndex=${count - 1}`,
   /** 分页取历史（查询某人时按页拉取，直到取空） */
@@ -371,6 +376,13 @@ export interface LcuChampSelectSession {
   myTeam: LcuChampSelectPlayer[]
   theirTeam: LcuChampSelectPlayer[]
   localPlayerCellId: number
+}
+
+/** 大厅成员：只有本人这支预组队，没有分组字段，靠成员列表判断人数 */
+export interface LcuLobbyMember {
+  puuid: string
+  summonerId?: number
+  isLeader?: boolean
 }
 
 export interface LcuMatchParticipant {
